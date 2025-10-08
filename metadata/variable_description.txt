@@ -1,0 +1,53 @@
+Variable Description (SARSA–FIS Hybrid Framework)
+================================================
+
+Q-table (SARSA_QTable_GBPUSD.txt)
+  - Format: 3 x 3 matrix (states x actions)
+  - Q[s,a]: Estimated action-value for state s and action a
+
+SARFIS_Weights (SARFIS_Weights_GBPUSD.txt)
+  - Format: 3 x 3 x 3 array of Sugeno consequents
+  - Each entry corresponds to rule output in {0.5, 1.5, 2.5} (Sell, Hold, Buy)
+
+MaxDrawdownStatus.txt
+  - "true" / "false" sentinel to enable global kill-switch for drawdown protection
+
+States
+  - S1: price < EMA50 - 20 pips (Below)
+  - S2: price within ±20 pips of EMA50 (Near)
+  - S3: price > EMA50 + 20 pips (Above)
+
+Actions
+  - 0: Stay
+  - 1: Next
+  - 2: Jump
+
+Technical Indicators
+  - EMA50: Exponential Moving Average (50 periods)
+  - EMA10: Exponential Moving Average (10 periods)
+  - MACD(12,26,9): MACD line and histogram for momentum confirmation
+  - ATR14: Average True Range (14 periods) for volatility scaling
+  - StdDev50: Rolling standard deviation (50 periods) for volatility
+  - EMA-STD: EMA of StdDev50 used for adaptive alpha
+
+Hyperparameters
+  - gamma: Discount factor for SARSA (γ = 0.9)
+  - epsilon (ε): Exploration probability (initial ε0 = 0.30)
+  - epsilon_min: Minimum exploration floor (0.05)
+  - decay: Multiplicative decay per tick (0.999)
+  - alpha_min: Minimum learning rate (0.01)
+  - alpha_max: Maximum learning rate (0.30)
+  - TP: Take-profit per position (10 USD; auxiliary close at 12 USD)
+  - CL: Cut-loss per position (-8 USD)
+  - drawdown_reset_threshold: Floating drawdown % to reset ε (20%)
+  - trade_spacing_hours: Minimum spacing between trades (4 hours)
+
+Files for Reproducibility
+  - run_metadata.csv: CSV with fields [run_id, start_time, end_time, seed, epsilon0, gamma, alpha_min, alpha_max, notes]
+  - RuleBase_27.csv: 27-rule table mapping (CS, PS, RW) -> consequent output
+  - example_backtest_report.html / .pdf: Backtest outputs from MT5 (archived)
+
+Reproducibility Notes
+  - RNG seed: Use fixed_seed for strict determinism (e.g., MathSrand(fixed_seed))
+  - MT5 build: Results reported on MQL5 build 5320; variations in build/tick feed may alter outcomes
+  - Data normalization: Price pip conversion must match symbol point size and account currency

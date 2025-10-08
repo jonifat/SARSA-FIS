@@ -1,0 +1,62 @@
+Pseudocode: SARSA–FIS Hybrid Framework (High-Level)
+=================================================
+
+Initialize:
+  - Load persisted artifacts if available: Q-table (SARSA_QTable_GBPUSD.txt), 
+    Sugeno weights (SARFIS_Weights_GBPUSD.txt), MaxDrawdownStatus.txt
+  - Configure technical indicators: EMA50, EMA10, MACD(12,26,9), ATR(14), StdDev(50)
+  - Set SARSA hyperparameters: epsilon (ε0 = 0.30), epsilon_min = 0.05, decay = 0.999
+  - Set discount factor γ = 0.9
+  - Set learning rate bounds: alpha_min = 0.01, alpha_max = 0.30
+  - Define state mapping: S1 = price < EMA50 - 20 pips; S2 = within ±20 pips; S3 = price > EMA50 + 20 pips
+  - Define action space A = {Stay (0), Next (1), Jump (2)}
+  - Seed RNG (for reproducibility) using fixed_seed or TimeLocal() % 3
+
+On each market tick:
+  1. If MaxDrawdownStatus.txt == "true": CloseAllPositions(); halt new entries
+  2. Compute indicators: EMA50, EMA10, MACD hist, ATR14, StdDev50
+  3. Determine current state S based on price vs EMA50 with ±20 pip barrier
+  4. Update epsilon: ε = max(epsilon_min, ε * decay)
+     - If floating drawdown >= 20%: ε = ε0 (reset)
+  5. Choose action A using ε-greedy:
+     - With probability ε: select random action in A
+     - Else: select action = argmax_a Q[S,a]
+  6. Sample next state S' using TransitionMatrix (3×3×3 tensor)
+  7. Compute reward r = RewardMatrix[S,A,S'] (shaped reward cube)
+  8. Evaluate FIS:
+     - Inputs: normalized Q[S,A], normalized Q[S',A], r
+     - Fuzzify inputs into {Low, Moderate, High} using trapmf/trimf
+     - Apply 27 Sugeno rules -> consequents {0.5,1.5,2.5}
+     - Defuzzify by weighted average -> FIS_score
+     - Map FIS_score to signal: Sell (<1.0), Hold (~1.5), Buy (>2.0)
+  9. Confirm signal with short-term filters:
+     - EMA10 crossover condition and MACD histogram momentum must agree
+ 10. Apply risk filters:
+     - Minimum spacing between trades >= 4 hours
+     - Per-position TP = 10 USD, auxiliary close at 12 USD
+     - Per-position CL = -8 USD (or fuzzy-reversal-triggered closure)
+     - If any global stop: enforce MaxDrawdownStatus
+ 11. If all checks pass: Execute trade via TradeExecutor (CTrade)
+ 12. After trade execution or decision:
+     - Observe next action A' (according to policy)
+     - Update Q-table using SARSA update:
+         Q[S,A] += alpha * (r + gamma * Q[S',A'] - Q[S,A])
+       where alpha is adaptive: scaled by ATR and StdDev, clamped to [alpha_min, alpha_max]
+ 13. Persist artifacts periodically (or on deinit):
+     - Save Q-table -> SARSA_QTable_GBPUSD.txt
+     - Save SARFIS weights -> SARFIS_Weights_GBPUSD.txt
+     - Save run metadata to run_metadata.csv
+
+Deinitialize:
+  - Persist latest Q-table and SARFIS weights to disk
+  - Log final run metadata and RNG seed used
+
+Notes on Adaptive Alpha:
+  - Base alpha computed from ATR(14) normalized by historical ATR range
+  - Momentum bias: add bounded adjustment in [-0.1, +0.1] based on EMA deviation
+  - Final alpha = clamp(base_alpha + momentum_bias, alpha_min, alpha_max)
+
+Notes on Reward Shaping:
+  - Penalize Stay in unprofitable states (S1 or S3 if trend opposite)
+  - Reward transitions consistent with EMA trend and MACD momentum
+  - Include small exploration penalty to discourage random walk behavior

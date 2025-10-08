@@ -1,0 +1,5 @@
+The SARSA–FIS Hybrid Expert Advisor and its learning architecture are currently under patent review.
+Full source files are withheld temporarily to preserve intellectual property rights.
+For academic replication or peer verification, please contact the corresponding author at parwadi@trisakti.ac.id.
+
+© 2025 Joni Fat et al. All rights reserved. Non-commercial use only until patent finalization.
